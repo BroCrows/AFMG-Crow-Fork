@@ -75,6 +75,8 @@ function getMapInfo() {
     description: "Azgaar's Fantasy Map Generator output: azgaar.github.io/Fantasy-map-generator",
     exportedAt: new Date().toISOString(),
     mapName: mapName.value,
+    width: graphWidth,
+    height: graphHeight,
     seed,
     mapId
   };
@@ -88,12 +90,6 @@ function getSettings() {
     heightUnit: heightUnit.value,
     heightExponent: heightExponentInput.value,
     temperatureScale: temperatureScale.value,
-    barSize: barSizeInput.value,
-    barLabel: barLabel.value,
-    barBackOpacity: barBackOpacity.value,
-    barBackColor: barBackColor.value,
-    barPosX: barPosX.value,
-    barPosY: barPosY.value,
     populationRate: populationRate,
     urbanization: urbanization,
     mapSize: mapSizeOutput.value,

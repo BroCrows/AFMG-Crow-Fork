@@ -76,7 +76,7 @@ document
 
 // show popup with a list of Patreon supportes (updated manually)
 async function showSupporters() {
-  const {supporters} = await import("../dynamic/supporters.js?v=1.93.08");
+  const {supporters} = await import("../dynamic/supporters.js?v=1.97.14");
   const list = supporters.split("\n").sort();
   const columns = window.innerWidth < 800 ? 2 : 5;
 
@@ -119,9 +119,9 @@ function updateOutputToFollowInput(ev) {
 
 // Option listeners
 const optionsContent = byId("optionsContent");
-optionsContent.addEventListener("input", function (event) {
-  const id = event.target.id;
-  const value = event.target.value;
+
+optionsContent.addEventListener("input", event => {
+  const {id, value} = event.target;
   if (id === "mapWidthInput" || id === "mapHeightInput") mapSizeInputChange();
   else if (id === "pointsInput") changeCellsDensity(+value);
   else if (id === "culturesSet") changeCultureSet();
@@ -133,10 +133,8 @@ optionsContent.addEventListener("input", function (event) {
   else if (id === "transparencyInput") changeDialogsTheme(themeColorInput.value, value);
 });
 
-optionsContent.addEventListener("change", function (event) {
-  const id = event.target.id;
-  const value = event.target.value;
-
+optionsContent.addEventListener("change", event => {
+  const {id, value} = event.target;
   if (id === "zoomExtentMin" || id === "zoomExtentMax") changeZoomExtent(value);
   else if (id === "optionsSeed") generateMapWithSeed("seed change");
   else if (id === "uiSizeInput" || id === "uiSizeOutput") changeUiSize(value);
@@ -146,8 +144,8 @@ optionsContent.addEventListener("change", function (event) {
   else if (id === "stateLabelsModeInput") options.stateLabelsMode = value;
 });
 
-optionsContent.addEventListener("click", function (event) {
-  const id = event.target.id;
+optionsContent.addEventListener("click", event => {
+  const {id} = event.target;
   if (id === "restoreDefaultCanvasSize") restoreDefaultCanvasSize();
   else if (id === "optionsMapHistory") showSeedHistoryDialog();
   else if (id === "optionsCopySeed") copyMapURL();
@@ -327,6 +325,7 @@ const cellsDensityMap = {
 };
 
 function changeCellsDensity(value) {
+  pointsInput.value = value;
   const cells = cellsDensityMap[value] || 1000;
   pointsInput.dataset.cells = cells;
   pointsOutputFormatted.value = getCellsDensityValue(cells);
@@ -536,6 +535,7 @@ function applyStoredOptions() {
     const key = localStorage.key(i);
 
     if (key === "speakerVoice") continue;
+
     const input = byId(key + "Input") || byId(key);
     const output = byId(key + "Output");
 
@@ -543,6 +543,8 @@ function applyStoredOptions() {
     if (input) input.value = value;
     if (output) output.value = value;
     lock(key);
+
+    if (key === "points") changeCellsDensity(+value);
 
     // add saved style presets to options
     if (key.slice(0, 5) === "style") applyOption(stylePreset, key, key.slice(5));
@@ -581,6 +583,7 @@ function randomizeOptions() {
   const randomize = new URL(window.location.href).searchParams.get("options") === "default"; // ignore stored options
 
   // 'Options' settings
+  if (randomize || !locked("points")) changeCellsDensity(4); // reset to default, no need to randomize
   if (randomize || !locked("template")) randomizeHeightmapTemplate();
   if (randomize || !locked("regions")) regionsInput.value = regionsOutput.value = gauss(18, 5, 2, 30);
   if (randomize || !locked("provinces")) provincesInput.value = provincesOutput.value = gauss(20, 10, 20, 100);
@@ -691,7 +694,7 @@ function changeEra() {
 }
 
 async function openTemplateSelectionDialog() {
-  const HeightmapSelectionDialog = await import("../dynamic/heightmap-selection.js?v=1.93.12");
+  const HeightmapSelectionDialog = await import("../dynamic/heightmap-selection.js?v=1.96.00");
   HeightmapSelectionDialog.open();
 }
 
@@ -774,7 +777,7 @@ function showExportPane() {
 }
 
 async function exportToJson(type) {
-  const {exportToJson} = await import("../dynamic/export-json.js?v=1.93.03");
+  const {exportToJson} = await import("../dynamic/export-json.js?v=1.97.08");
   exportToJson(type);
 }
 
@@ -867,11 +870,9 @@ byId("mapToLoad").addEventListener("change", function () {
 });
 
 function openExportToPngTiles() {
+  byId("tileStatus").innerHTML = "";
   closeDialogs();
   updateTilesOptions();
-  const status = byId("tileStatus");
-  status.innerHTML = "";
-  let loading = null;
 
   const inputs = byId("exportToPngTilesScreen").querySelectorAll("input");
   inputs.forEach(input => input.addEventListener("input", updateTilesOptions));
@@ -881,16 +882,7 @@ function openExportToPngTiles() {
     title: "Download tiles",
     width: "23em",
     buttons: {
-      Download: function () {
-        status.innerHTML = "Preparing for download...";
-        setTimeout(() => (status.innerHTML = "Downloading. It may take some time."), 1000);
-        loading = setInterval(() => (status.innerHTML += "."), 1000);
-        exportToPngTiles().then(() => {
-          clearInterval(loading);
-          status.innerHTML = /* html */ `Done. Check file in "Downloads" (crtl + J)`;
-          setTimeout(() => (status.innerHTML = ""), 8000);
-        });
-      },
+      Download: () => exportToPngTiles(),
       Cancel: function () {
         $(this).dialog("close");
       }
@@ -898,7 +890,6 @@ function openExportToPngTiles() {
     close: () => {
       inputs.forEach(input => input.removeEventListener("input", updateTilesOptions));
       debug.selectAll("*").remove();
-      clearInterval(loading);
     }
   });
 }
@@ -928,18 +919,22 @@ function updateTilesOptions() {
   const labels = [];
   const tileW = (graphWidth / tilesX) | 0;
   const tileH = (graphHeight / tilesY) | 0;
-  for (let y = 0, i = 0; y + tileH <= graphHeight; y += tileH) {
-    for (let x = 0; x + tileW <= graphWidth; x += tileW, i++) {
+
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (let y = 0, row = 0; y + tileH <= graphHeight; y += tileH, row++) {
+    for (let x = 0, column = 1; x + tileW <= graphWidth; x += tileW, column++) {
       rects.push(`<rect x=${x} y=${y} width=${tileW} height=${tileH} />`);
-      labels.push(`<text x=${x + tileW / 2} y=${y + tileH / 2}>${i}</text>`);
+      const label = alphabet[row % alphabet.length] + column;
+      labels.push(`<text x=${x + tileW / 2} y=${y + tileH / 2}>${label}</text>`);
     }
   }
-  const rectsG = "<g fill='none' stroke='#000'>" + rects.join("") + "</g>";
-  const labelsG =
-    "<g fill='#000' stroke='none' text-anchor='middle' dominant-baseline='central' font-size='24px'>" +
-    labels.join("") +
-    "</g>";
-  debug.html(rectsG + labelsG);
+
+  debug.html(`
+    <g fill='none' stroke='#000'>${rects.join("")}</g>
+    <g fill='#000' stroke='none' text-anchor='middle' dominant-baseline='central' font-size='18px'>${labels.join(
+      ""
+    )}</g>
+  `);
 }
 
 // View mode

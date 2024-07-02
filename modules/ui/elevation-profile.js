@@ -109,8 +109,8 @@ function showElevationProfile(data, routeLen, isRiver) {
   draw();
 
   function downloadCSV() {
-    let data =
-      "Point,X,Y,Cell,Height,Height value,Population,Burg,Burg population,Biome,Biome color,Culture,Culture color,Religion,Religion color,Province,Province color,State,State color\n"; // headers
+    let csv =
+      "Id,x,y,lat,lon,Cell,Height,Height value,Population,Burg,Burg population,Biome,Biome color,Culture,Culture color,Religion,Religion color,Province,Province color,State,State color\n"; // headers
 
     for (let k = 0; k < chartData.points.length; k++) {
       let cell = chartData.cell[k];
@@ -123,35 +123,39 @@ function showElevationProfile(data, routeLen, isRiver) {
       let pop = pack.cells.pop[cell];
       let h = pack.cells.h[cell];
 
-      data += k + 1 + ",";
-      data += chartData.points[k][0] + ",";
-      data += chartData.points[k][1] + ",";
-      data += cell + ",";
-      data += getHeight(h) + ",";
-      data += h + ",";
-      data += rn(pop * populationRate) + ",";
+      csv += k + 1 + ",";
+      const [x, y] = pack.cells.p[data[k]];
+      csv += x + ",";
+      csv += y + ",";
+      const lat = getLatitude(y, 2);
+      const lon = getLongitude(x, 2);
+      csv += lat + ",";
+      csv += lon + ",";
+      csv += cell + ",";
+      csv += getHeight(h) + ",";
+      csv += h + ",";
+      csv += rn(pop * populationRate) + ",";
       if (burg) {
-        data += pack.burgs[burg].name + ",";
-        data += pack.burgs[burg].population * populationRate * urbanization + ",";
+        csv += pack.burgs[burg].name + ",";
+        csv += pack.burgs[burg].population * populationRate * urbanization + ",";
       } else {
-        data += ",0,";
+        csv += ",0,";
       }
-      data += biomesData.name[biome] + ",";
-      data += biomesData.color[biome] + ",";
-      data += pack.cultures[culture].name + ",";
-      data += pack.cultures[culture].color + ",";
-      data += pack.religions[religion].name + ",";
-      data += pack.religions[religion].color + ",";
-      data += pack.provinces[province].name + ",";
-      data += pack.provinces[province].color + ",";
-      data += pack.states[state].name + ",";
-      data += pack.states[state].color + ",";
-
-      data = data + "\n";
+      csv += biomesData.name[biome] + ",";
+      csv += biomesData.color[biome] + ",";
+      csv += pack.cultures[culture].name + ",";
+      csv += pack.cultures[culture].color + ",";
+      csv += pack.religions[religion].name + ",";
+      csv += pack.religions[religion].color + ",";
+      csv += pack.provinces[province].name + ",";
+      csv += pack.provinces[province].color + ",";
+      csv += pack.states[state].name + ",";
+      csv += pack.states[state].color + ",";
+      csv += "\n";
     }
 
     const name = getFileName("elevation profile") + ".csv";
-    downloadFile(data, name);
+    downloadFile(csv, name);
   }
 
   function draw() {
@@ -193,8 +197,15 @@ function showElevationProfile(data, routeLen, isRiver) {
       .attr("d", "M0,0 V4 L2,2 Z")
       .attr("fill", "darkgray");
 
-    let colors = getColorScheme(terrs.attr("scheme"));
-    const landdef = chart.select("defs").append("linearGradient").attr("id", "landdef").attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%");
+    const colors = getColorScheme("natural");
+    const landdef = chart
+      .select("defs")
+      .append("linearGradient")
+      .attr("id", "landdef")
+      .attr("x1", "0%")
+      .attr("y1", "0%")
+      .attr("x2", "0%")
+      .attr("y2", "100%");
 
     if (chartData.mah == chartData.mih) {
       landdef
@@ -247,7 +258,14 @@ function showElevationProfile(data, routeLen, isRiver) {
     path += " L" + parseInt(xscale(extra.length) + +xOffset) + "," + parseInt(yscale(0) + +yOffset);
     path += " L" + parseInt(xscale(0) + +xOffset) + "," + parseInt(yscale(0) + +yOffset);
     path += "Z";
-    chart.append("g").attr("id", "epland").append("path").attr("d", path).attr("stroke", "purple").attr("stroke-width", "0").attr("fill", "url(#landdef)");
+    chart
+      .append("g")
+      .attr("id", "epland")
+      .append("path")
+      .attr("d", path)
+      .attr("stroke", "purple")
+      .attr("stroke-width", "0")
+      .attr("fill", "url(#landdef)");
 
     // biome / heights
     let g = chart.append("g").attr("id", "epbiomes");
@@ -289,7 +307,14 @@ function showElevationProfile(data, routeLen, isRiver) {
         chartData.cell[k] +
         ")";
 
-      g.append("rect").attr("stroke", c).attr("fill", c).attr("x", x).attr("y", y).attr("width", xscale(1)).attr("height", 15).attr("data-tip", dataTip);
+      g.append("rect")
+        .attr("stroke", c)
+        .attr("fill", c)
+        .attr("x", x)
+        .attr("y", y)
+        .attr("width", xscale(1))
+        .attr("height", 15)
+        .attr("data-tip", dataTip);
     }
 
     const xAxis = d3
@@ -314,10 +339,7 @@ function showElevationProfile(data, routeLen, isRiver) {
       .attr("transform", "translate(" + xOffset + "," + parseInt(chartHeight + +yOffset + 20) + ")")
       .call(xAxis)
       .selectAll("text")
-      .style("text-anchor", "center")
-      .attr("transform", function (d) {
-        return "rotate(0)"; // used to rotate labels, - anti-clockwise, + clockwise
-      });
+      .style("text-anchor", "center");
 
     chart
       .append("g")
@@ -371,7 +393,17 @@ function showElevationProfile(data, routeLen, isRiver) {
         // arrow from burg name to graph line
         g.append("path")
           .attr("id", "eparrow" + b)
-          .attr("d", "M" + x1.toString() + "," + (y1 + 3).toString() + "L" + x1.toString() + "," + parseInt(chartData.points[k][1] - 3).toString())
+          .attr(
+            "d",
+            "M" +
+              x1.toString() +
+              "," +
+              (y1 + 3).toString() +
+              "L" +
+              x1.toString() +
+              "," +
+              parseInt(chartData.points[k][1] - 3).toString()
+          )
           .attr("stroke", "darkgray")
           .attr("fill", "lightgray")
           .attr("stroke-width", "1")
